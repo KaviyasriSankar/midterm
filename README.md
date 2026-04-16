@@ -104,4 +104,120 @@ pipeline {
  }
 }
 
+DOCKER (MAKE SURE IN PIPELINE SCRIPT U GIVEN YOUR DOCKER USERNAME AND GIT URL)
+DA 4:
+Dockers:
+Github 
+deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: html-demo
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: html-demo
+  template:
+    metadata:
+      labels:
+        app: html-demo
+    spec:
+      containers:
+      - name: html-demo
+        image: swetab84/html-demo:latest
+        ports:
+        - containerPort: 80
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: html-demo-service
+spec:
+  type: NodePort
+  selector:
+    app: html-demo
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 30010
+
+Create index.html:
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>CI/CD Demo</title>
+<style>
+body{
+text-align:center;
+font-family:Times New Roman;
+background-color:#af0d0d;
+}
+h1{
+color:#0ef777;
+}
+</style>
+</head>
+<body>
+<h1>CI/CD Pipeline Working</h1>
+<h2>Deployed using Jenkins + Docker + Kubernetes</h2>
+<p>This webpage is automatically deployed using a CI/CD pipeline.</p>
+</body>
+</html>
+Create a Dockerfile
+FROM nginx:latest
+COPY index.html /usr/share/nginx/html/index.html
+EXPOSE 80
+GO to dockerhub -> In settings check kubernets check its enable and also check kubeadm
+After that open Jenkins-> In Jenkins Setting --> Credentials -> system global click -> add crentencials->  (Docker hub)User name:  Password:    ID:dockerhub and then click create
+add Credentials – kind:Secret file –>file(choose config in window c -user-admin-kube.-config)->id kuberconfig->description: Kubernetes crendentials-> and click create
+After this : Create New Item -> Pipeline Paste the code in pipeline script - Update URL of GIT repository - Make sure credentialsId: “dockerhub” username
+Pipeline: 
+pipeline {
+    agent any
+    environment {
+        DOCKER_IMAGE = "kaviyasankar2006/html-demo"
+    }
+    stages {
+        stage('Clone Code') {
+            steps {
+                git branch: 'main',
+                url: 'https://github.com/prithiyangadevi-r/dockers.git'
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                bat "docker build -t %DOCKER_IMAGE% ."
+            }
+        }
+        stage('Push Image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub',
+                usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    bat '''
+                    echo %PASS% | docker login -u %USER% --password-stdin
+                    docker push %DOCKER_IMAGE%
+                    '''
+                }
+            }
+        }
+        stage('Deploy to Kubernetes') {
+            steps {
+                withCredentials([file(credentialsId: 'kuberconfig', variable: 'KUBECONFIG')]) {
+                    bat '''
+                    set KUBECONFIG=%KUBECONFIG%
+                    kubectl apply -f deployment.yaml --validate=false
+                    '''
+                }
+            }
+        }
+    }
+}
+and then click build now and check console output
+after this open docker: builders,containers,images->take all screenshot
+open that link which mam provided So check if the HTML file open in http://localhost:30010 
+
 
